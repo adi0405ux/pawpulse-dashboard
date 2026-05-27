@@ -2,81 +2,65 @@ import streamlit as st
 import paho.mqtt.client as mqtt
 import json
 import time
-import os
 
+# --- UI CONFIGURATION ---
 st.set_page_config(page_title="PawPulse Dashboard", page_icon="🐾", layout="centered")
+st.title("🐾 PawPulse: Live Vitals")
+st.markdown("---")
 
-# 1. The File Bridge
-DATA_FILE = "sensor_data.json"
+# --- SESSION STATE INITIALIZATION ---
+# This acts as our temporary database to hold the live data
+if 'bpm' not in st.session_state:
+    st.session_state.bpm = "--"
+if 'temp' not in st.session_state:
+    st.session_state.temp = "--"
 
+# --- MQTT CALLBACKS ---
 def on_connect(client, userdata, flags, rc):
-    client.subscribe("pawpulse/aditri/alerts")
+    if rc == 0:
+        client.subscribe("pawpulse/vitals")
+    else:
+        print(f"Failed to connect, return code {rc}")
 
 def on_message(client, userdata, msg):
-    # Background thread writes incoming internet data directly to the local disk
     try:
-        data = json.loads(msg.payload.decode())
-        data["last_sync"] = time.strftime("%I:%M:%S %p")
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f)
-    except:
-        pass
+        # Decode the JSON payload from the ESP32
+        payload = json.loads(msg.payload.decode())
+        
+        # Update the session state variables
+        st.session_state.bpm = payload.get("bpm", "--")
+        st.session_state.temp = payload.get("temp", "--")
+    except Exception as e:
+        print(f"Data parsing error: {e}")
 
-@st.cache_resource
-def start_mqtt():
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.connect("broker.hivemq.com", 1883, 60)
+# --- MQTT CLIENT SETUP ---
+# Standard public broker for testing
+broker = "test.mosquitto.org"
+port = 1883
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+try:
+    client.connect(broker, port, 60)
     client.loop_start()
-    return client
+except Exception as e:
+    st.error(f"MQTT Connection Error: {e}")
 
-start_mqtt()
-
-# 2. Main UI Thread reads from the disk safely
-status = "NORMAL"
-delta = 0
-last_sync = "Never"
-
-if os.path.exists(DATA_FILE):
-    try:
-        with open(DATA_FILE, "r") as f:
-            data = json.load(f)
-            status = data.get("status", "NORMAL")
-            delta = data.get("transient_delta", 0)
-            last_sync = data.get("last_sync", "Never")
-    except:
-        pass
-
-# 3. UI Rendering
-st.title("🩺 PawPulse Clinical Dashboard")
-st.markdown("---")
-st.subheader("Patient Vitals Profile")
-
+# --- DASHBOARD UI ---
+# Create two columns for a clean metric display
 col1, col2 = st.columns(2)
+
 with col1:
-    st.info("**Patient ID:** \n\n Canine Unit A")
+    st.metric(label="❤️ Heart Rate", value=f"{st.session_state.bpm} BPM")
+
 with col2:
-    st.success("**Hardware Link:** \n\n ONLINE")
-
-st.markdown("### Active Diagnostics Gating")
-
-if status == "CRITICAL_RALE_DETECTED":
-    st.error("⚠️ **CRITICAL ANOMALY VERIFIED**")
-    st.warning(f"**Calculated Signal Delta ($dV/dt$):** {delta}")
-else:
-    st.success("✅ **Patient Breathing Baseline Normal**")
-    st.info("No pulmonary anomalies caught within current sampling cycle.")
+    st.metric(label="🌡️ Body Temp", value=f"{st.session_state.temp} °F")
 
 st.markdown("---")
+st.caption("Awaiting real-time telemetry from ESP32 Edge Node...")
 
-if st.button("🔄 Acknowledge & Clear Alert"):
-    with open(DATA_FILE, "w") as f:
-        json.dump({"status": "NORMAL", "transient_delta": 0, "last_sync": "Cleared by Vet"}, f)
-    st.rerun()
-
-st.caption(f"Last Telemetry Sync Frame: {last_sync}")
-
-# Force the UI to refresh every second
-time.sleep(1)
+# Auto-refresh the Streamlit UI every 2 seconds to fetch new data
+time.sleep(2)
 st.rerun()
