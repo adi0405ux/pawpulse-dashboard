@@ -9,7 +9,6 @@ st.title("🐾 PawPulse: Live Vitals")
 st.markdown("---")
 
 # --- SESSION STATE INITIALIZATION ---
-# This acts as our temporary database to hold the live data
 if 'bpm' not in st.session_state:
     st.session_state.bpm = "--"
 if 'temp' not in st.session_state:
@@ -33,12 +32,12 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Data parsing error: {e}")
 
-# --- MQTT CLIENT SETUP ---
-# Standard public broker for testing
+# --- MQTT CLIENT SETUP (WEBSOCKETS FIX) ---
 broker = "test.mosquitto.org"
-port = 1883
+port = 8080  # Changed from 1883 to 8080 for WebSockets
 
-client = mqtt.Client()
+# Force WebSockets to bypass Streamlit Cloud TCP restrictions
+client = mqtt.Client(transport="websockets")
 client.on_connect = on_connect
 client.on_message = on_message
 
@@ -49,7 +48,6 @@ except Exception as e:
     st.error(f"MQTT Connection Error: {e}")
 
 # --- DASHBOARD UI ---
-# Create two columns for a clean metric display
 col1, col2 = st.columns(2)
 
 with col1:
