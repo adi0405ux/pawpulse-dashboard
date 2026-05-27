@@ -1,6 +1,7 @@
 import streamlit as st
 import paho.mqtt.client as mqtt
 import json
+import ssl
 from streamlit_autorefresh import st_autorefresh
 
 # --- UI CONFIGURATION ---
@@ -32,14 +33,17 @@ def on_message(client, userdata, msg):
 
 # --- MQTT SETUP ---
 if 'mqtt_client' not in st.session_state:
-    # Force WebSockets to bypass the cloud firewall
     client = mqtt.Client(transport="websockets")
+    
+    # --- THE SECURE WSS FIX ---
+    client.tls_set()  # Enable SSL/TLS encryption
+    
     client.on_connect = on_connect
     client.on_message = on_message
     
     try:
-        # HiveMQ WebSocket port is 8000
-        client.connect("broker.hivemq.com", 8000, 60)
+        # Connect using the SECURE WebSockets port (8884)
+        client.connect("broker.hivemq.com", 8884, 60)
         client.loop_start()
         st.session_state.mqtt_client = client
     except Exception as e:
@@ -55,4 +59,4 @@ with col2:
     st.metric(label="🌡️ Body Temp", value=f"{st.session_state.temp} °F")
 
 st.markdown("---")
-st.caption("Listening on broker.hivemq.com (WebSockets) | Topic: pawpulse/vitals")
+st.caption("Listening on broker.hivemq.com (Secure WSS) | Topic: pawpulse/vitals")
