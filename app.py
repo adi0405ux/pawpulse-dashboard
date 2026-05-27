@@ -32,12 +32,11 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Data parsing error: {e}")
 
-# --- MQTT CLIENT SETUP (WEBSOCKETS FIX) ---
-broker = "test.mosquitto.org"
-port = 8080  # Changed from 1883 to 8080 for WebSockets
+# --- MQTT CLIENT SETUP (THE HIVEMQ PIVOT) ---
+broker = "broker.hivemq.com"
+port = 1883
 
-# Force WebSockets to bypass Streamlit Cloud TCP restrictions
-client = mqtt.Client(transport="websockets")
+client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
 
