@@ -9,7 +9,6 @@ st.title("🐾 PawPulse: Live Vitals")
 st.markdown("---")
 
 # --- AUTO-REFRESH ENGINE ---
-# This silently updates the UI every 2 seconds without triggering a hard script reset
 st_autorefresh(interval=2000, key="data_refresh")
 
 # --- SESSION STATE (PERSISTENT MEMORY) ---
@@ -26,25 +25,25 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        # Write directly to Streamlit's persistent memory state
         st.session_state.bpm = payload.get("bpm", "--")
         st.session_state.temp = payload.get("temp", "--")
-    except Exception as e:
-        print(f"JSON Error: {e}")
+    except Exception:
+        pass
 
 # --- MQTT SETUP ---
-# Initialize the client ONLY ONCE to prevent connection spam
 if 'mqtt_client' not in st.session_state:
-    client = mqtt.Client()
+    # Force WebSockets to bypass the cloud firewall
+    client = mqtt.Client(transport="websockets")
     client.on_connect = on_connect
     client.on_message = on_message
     
     try:
-        client.connect("broker.hivemq.com", 1883, 60)
+        # HiveMQ WebSocket port is 8000
+        client.connect("broker.hivemq.com", 8000, 60)
         client.loop_start()
         st.session_state.mqtt_client = client
     except Exception as e:
-        st.error("Failed to bridge MQTT connection.")
+        st.error(f"MQTT Connection Error: {e}")
 
 # --- DASHBOARD UI ---
 col1, col2 = st.columns(2)
@@ -56,4 +55,4 @@ with col2:
     st.metric(label="🌡️ Body Temp", value=f"{st.session_state.temp} °F")
 
 st.markdown("---")
-st.caption("Listening on broker.hivemq.com | Topic: pawpulse/vitals")
+st.caption("Listening on broker.hivemq.com (WebSockets) | Topic: pawpulse/vitals")
