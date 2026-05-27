@@ -69,6 +69,12 @@ else:
     st.info("No pulmonary anomalies caught within current sampling cycle.")
 
 st.markdown("---")
+
+if st.button("🔄 Acknowledge & Clear Alert"):
+    with open(DATA_FILE, "w") as f:
+        json.dump({"status": "NORMAL", "transient_delta": 0, "last_sync": "Cleared by Vet"}, f)
+    st.rerun()
+
 st.caption(f"Last Telemetry Sync Frame: {last_sync}")
 
 # Force the UI to refresh every second
